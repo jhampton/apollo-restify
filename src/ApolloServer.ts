@@ -1,6 +1,6 @@
-import { ApolloServerBase, GraphQLOptions } from 'apollo-server-core';
+import { ApolloServerBase, GraphQLOptions, HttpQueryError } from 'apollo-server-core';
 import { Request, Response } from 'restify';
-import { renderPlaygroundPage } from '@apollographql/graphql-playground-html';
+import { renderPlaygroundPage, RenderPageOptions } from '@apollographql/graphql-playground-html';
 import { parseAll } from 'accept';
 
 import { graphqlRestify } from './restifyApollo';
@@ -10,10 +10,16 @@ export type OnError = (req: Request, res: Response, status: number, error?: Erro
 
 export interface ServerRegistration {
     path?: string;
-    onError?: OnError;
 }
 
 export const HEALTH_CHECK_URL = '/.well-known/apollo/server-health';
+
+// Interface for Restify middleware
+interface RestifyHandler {
+    req: Request;
+    res: Response;
+    next: Function;
+}
 
 export class ApolloServer extends ApolloServerBase {
     // This integration does not support file uploads.
@@ -33,24 +39,24 @@ export class ApolloServer extends ApolloServerBase {
 
     // Prepares and returns an async function that can be used by Micro to handle
     // GraphQL requests.
-    public createHandler({ path, onError }: ServerRegistration = {}) {
+    public createHandler({ path }: ServerRegistration = {}) {
         // We'll kick off the `willStart` right away, so hopefully it'll finish
         // before the first request comes in.
         const promiseWillStart = this.willStart();
 
-        return async (req: Request, res: Response) => {
+        return async (req: Request, res: Response, next: Function) => {
             this.graphqlPath = path || '/graphql';
 
             await promiseWillStart;
 
-            if (!this.handleGraphqlRequestsWithPlayground({ req, res })) {
-                await this.handleGraphqlRequestsWithServer({ req, res, onError });
+            if (!this.handleGraphqlRequestsWithPlayground({ req, res, next })) {
+                await this.handleGraphqlRequestsWithServer({ req, res, next });
             }
         };
     }
 
     createHealthCheckHandler({ onHealthCheck }: { onHealthCheck?: OnHealthCheck } = {}) {
-        return async (req: Request, res: Response) => {
+        return async (req: Request, res: Response, next: Function) => {
             // Response follows
             // https://tools.ietf.org/html/draft-inadarei-api-health-check-01
             res.header('Content-Type', 'application/health+json');
@@ -73,11 +79,9 @@ export class ApolloServer extends ApolloServerBase {
     // incoming GraphQL requests.
     private handleGraphqlRequestsWithPlayground({
         req,
-        res
-    }: {
-        req: Request;
-        res: Response;
-    }): boolean {
+        res,
+        next
+    }: RestifyHandler): boolean {
         let handled = false;
 
         if (this.playgroundOptions && req.method === 'GET') {
@@ -88,48 +92,44 @@ export class ApolloServer extends ApolloServerBase {
                 'text/html';
 
             if (prefersHTML) {
-                const middlewareOptions = {
+                const middlewareOptions:RenderPageOptions = {
+                    version: "1",
                     endpoint: this.graphqlPath,
                     subscriptionEndpoint: this.subscriptionsPath,
                     ...this.playgroundOptions
                 };
-                res.sendRaw(200, renderPlaygroundPage(middlewareOptions), {
+                res.send(200, renderPlaygroundPage(middlewareOptions), {
                     'Content-Type': 'text/html'
                 });
-                handled = true;
+                return next();
             }
         }
 
-        return handled;
+        return next();
     }
 
     // Handle incoming GraphQL requests using Apollo Server.
     private async handleGraphqlRequestsWithServer({
         req,
         res,
-        onError
-    }: {
-        req: Request;
-        res: Response;
-        onError?: OnError;
-    }): Promise<void> {
+        next,
+    }: RestifyHandler): Promise<void> {
         const graphqlHandler = graphqlRestify(() => {
             return this.createGraphQLServerOptions(req, res);
         });
 
         try {
             const { responseInit, graphqlResponse } = await graphqlHandler(req, res);
-            res.sendRaw(200, graphqlResponse, responseInit.headers);
+            res.send(200, graphqlResponse, responseInit.headers);
+            return next();
         } catch (error) {
+            // Per the Restify documentation, errors will be set on the response
+            // and the HttpQueryError will be passed to `next`.
             if ('HttpQueryError' === error.name && error.headers) {
                 res.set(error.headers);
             }
-
-            if (onError) {
-                onError(req, res, error.statusCude || 500, error);
-            } else {
-                res.sendRaw(error.statusCode || 500, error.message);
-            }
+            res.send(error.statusCode || 500, error.message);
+            next(error);
         }
     }
 }
