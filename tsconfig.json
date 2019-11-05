@@ -8,7 +8,8 @@
         "strict": true,
         "outDir": "lib",
         "declaration": true,
-        "declarationMap": true
+        "declarationMap": true,
+        "sourceMap": true
     },
     "include": [
         "src/**/*"

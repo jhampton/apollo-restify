@@ -25,7 +25,7 @@
   "author": "Jordan Gensler <jordangens@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@apollographql/graphql-playground-html": "^1.6.6",
+    "@apollographql/graphql-playground-html": "^1.6.24",
     "@babel/preset-env": "^7.6.3",
     "@babel/preset-typescript": "^7.6.0",
     "@types/jest": "^24.0.18",

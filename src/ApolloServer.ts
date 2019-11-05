@@ -26,7 +26,7 @@ export class ApolloServer extends ApolloServerBase {
     protected supportsUploads(): boolean {
         return false;
     }
-
+    
     // This integration supports subscriptions.
     protected supportsSubscriptions(): boolean {
         return true;
@@ -37,7 +37,7 @@ export class ApolloServer extends ApolloServerBase {
         return super.graphQLServerOptions({ req, res });
     }
 
-    // Prepares and returns an async function that can be used by Micro to handle
+    // Prepares and returns an async function that can be used by restify to handle
     // GraphQL requests.
     public createHandler({ path }: ServerRegistration = {}) {
         // We'll kick off the `willStart` right away, so hopefully it'll finish
@@ -49,9 +49,10 @@ export class ApolloServer extends ApolloServerBase {
 
             await promiseWillStart;
 
-            if (!this.handleGraphqlRequestsWithPlayground({ req, res, next })) {
-                await this.handleGraphqlRequestsWithServer({ req, res, next });
-            }
+            // If this is a playground request, execute and call next()
+            if (this.handleGraphqlRequestsWithPlayground({ req, res, next })) return next();
+            // Otherwise handle with server
+            await this.handleGraphqlRequestsWithServer({ req, res, next });
         };
     }
 
@@ -71,6 +72,7 @@ export class ApolloServer extends ApolloServerBase {
             }
 
             res.send(200, { status: 'pass' });
+            return next();
         };
     }
 
@@ -98,14 +100,15 @@ export class ApolloServer extends ApolloServerBase {
                     subscriptionEndpoint: this.subscriptionsPath,
                     ...this.playgroundOptions
                 };
-                res.send(200, renderPlaygroundPage(middlewareOptions), {
+                const playgroundHTML = renderPlaygroundPage(middlewareOptions);
+                res.sendRaw(200, playgroundHTML, {
                     'Content-Type': 'text/html'
                 });
-                return next();
+                return true;
             }
         }
 
-        return next();
+        return false;
     }
 
     // Handle incoming GraphQL requests using Apollo Server.
@@ -120,7 +123,7 @@ export class ApolloServer extends ApolloServerBase {
 
         try {
             const { responseInit, graphqlResponse } = await graphqlHandler(req, res);
-            res.send(200, graphqlResponse, responseInit.headers);
+            res.sendRaw(200, graphqlResponse, responseInit.headers);
             return next();
         } catch (error) {
             // Per the Restify documentation, errors will be set on the response
@@ -128,7 +131,7 @@ export class ApolloServer extends ApolloServerBase {
             if ('HttpQueryError' === error.name && error.headers) {
                 res.set(error.headers);
             }
-            res.send(error.statusCode || 500, error.message);
+            res.sendRaw(error.statusCode || 500, error.message);
             next(error);
         }
     }

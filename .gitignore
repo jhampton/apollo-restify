@@ -1,2 +1,5 @@
 node_modules/
 lib/
+apollo-restify.code-workspace
+.vscode/launch.json
+coverage
