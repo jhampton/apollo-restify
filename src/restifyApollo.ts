@@ -17,6 +17,8 @@ export function graphqlRestify(options: GraphQLOptions | RestifyGraphQLOptionsFu
         throw new Error(`Apollo Server expects exactly one argument, got ${arguments.length}`);
     }
 
+    
+
     const graphqlHandler = async (req: Request, res: Response) => {
         return runHttpQuery([req, res], {
             method: req.method!,

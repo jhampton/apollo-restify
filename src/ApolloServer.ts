@@ -50,9 +50,14 @@ export class ApolloServer extends ApolloServerBase {
             await promiseWillStart;
 
             // If this is a playground request, execute and call next()
-            if (this.handleGraphqlRequestsWithPlayground({ req, res, next })) return next();
-            // Otherwise handle with server
-            await this.handleGraphqlRequestsWithServer({ req, res, next });
+            if (this.handleGraphqlRequestsWithPlayground({ req, res, next })) {
+                next();
+                return
+            } else {
+                // Otherwise handle with server
+                await this.handleGraphqlRequestsWithServer({ req, res, next });
+            }
+            
         };
     }
 
@@ -72,7 +77,7 @@ export class ApolloServer extends ApolloServerBase {
             }
 
             res.send(200, { status: 'pass' });
-            return next();
+            next();
         };
     }
 
@@ -117,10 +122,8 @@ export class ApolloServer extends ApolloServerBase {
         res,
         next,
     }: RestifyHandler): Promise<void> {
-        const graphqlHandler = graphqlRestify(() => {
-            return this.createGraphQLServerOptions(req, res);
-        });
-
+        const graphqlHandler = graphqlRestify(() => this.createGraphQLServerOptions(req, res));
+    
         try {
             const { responseInit, graphqlResponse } = await graphqlHandler(req, res);
             res.sendRaw(200, graphqlResponse, responseInit.headers);

@@ -23,8 +23,6 @@ const apolloServer = new ApolloServer({
 const server = restify.createServer();
 server.use(restify.plugins.bodyParser());
 
-const DD = console.dir;
-
 // Playground
 server.get('/graphql', apolloServer.createHandler());
 // Data endpoint:
