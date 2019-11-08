@@ -2,11 +2,19 @@
 
 This is a implementation of Apollo Server 2 as Restify middleware.
 
-## Installing
+## Installing (Pending publish)
+
+For now, clone/download this repository and `import { ApolloServer } from 'LOCATION-OF-REPO'`
+
+*PENDING PUBLISH*
 
 ```bash
-npm install apollo-restify
+npm install @apollo/restify
 ```
+
+## Example
+
+See the `example` directory for a runnable example.  Use `node index.js` to run.
 
 ## Using
 
@@ -33,3 +41,8 @@ server.post('/graphql', apolloServer.createHandler());
 import { HEALTH_CHECK_URL } from 'apollo-restify';
 server.get(HEALTH_CHECK_URL, apolloServer.createHealthCheckHandler());
 ```
+## Building and Tests
+
+Use `npm run watch` to watch files and compile from TS -> JS.
+
+There are basic sanity and smoke tests written in Jest.  Use `npm run test` to run tests in CI or use `npm run test:watch` to auto-run tests on change.
