@@ -80,16 +80,16 @@ describe('Apollo Restify integration', () => {
         _callback();
     });
     // ApolloServer Sanity
-    it('Creates an Apollo Server', () => {
+    it('SANITY: Creates an Apollo Server', () => {
         expect(apolloServer).toBeInstanceOf(ApolloServer);
     });
     // Restify Sanity
-    it('Creates a restify server', () => {
+    it('SANITY: Creates a restify server', () => {
         expect(server).toHaveProperty('get','post','listen');
     });
 
     // Apollo-restify
-    it("Apollo Server returns expected mock data", (_callback) => {
+    it("SMOKE: Apollo Server returns expected mock data", (_callback) => {
         const expectedData = {
             "data": {
                 "me": {
@@ -107,7 +107,7 @@ describe('Apollo Restify integration', () => {
         });
     });
 
-    it("Apollo Server Calls 'Next' during normal operation", (_callback) => {
+    it("SMOKE: Apollo Server Calls 'Next' during normal operation", (_callback) => {
         const queryHandler = apolloServer.createHandler();
         const data = `{"operationName":null,"variables":{},"query":"{me {name}}"}`;
         
@@ -122,7 +122,6 @@ describe('Apollo Restify integration', () => {
                 'Content-Length': data.length
             }
         });
-        // const mockRequest = http.request(options);
         const testResponse = {
             sendRaw: jest.fn(),
             set: jest.fn()
@@ -135,7 +134,7 @@ describe('Apollo Restify integration', () => {
         })
     });
 
-    it("Apollo Server Calls 'Next' with error for error cases", (_callback) => {
+    it("SMOKE: Apollo Server Calls 'Next' with error for error cases", (_callback) => {
         const queryHandler = apolloServer.createHandler();
         // const data = JSON.stringify({"operationName":null,"variables":{},"query":"{invalid {query}}"});
         const data = {"operationName":null,"variables":{},"query":"{invalid {query}}"};
@@ -151,7 +150,6 @@ describe('Apollo Restify integration', () => {
                 'Content-Length': data.length
             }
         });
-        // const mockRequest = http.request(options);
         const testResponse = {
             sendRaw: jest.fn(),
             set: jest.fn()
@@ -160,7 +158,7 @@ describe('Apollo Restify integration', () => {
         const testNext = jest.fn((thing) => nextErrorParam = thing);
         // Data endpoint
         queryHandler(testRequest, testResponse, testNext).then(() => {
-            // expect(testNext).toBeCalledTimes(1);
+            expect(testNext).toBeCalledTimes(1);
             expect(expectedError).toEqual(expectedError);
             _callback();
         })
