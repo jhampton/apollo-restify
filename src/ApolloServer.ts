@@ -1,72 +1,83 @@
-import { ApolloServerBase, GraphQLOptions, HttpQueryError } from 'apollo-server-core';
+import {
+    ApolloServerBase,
+    GraphQLOptions,
+    runHttpQuery,
+    convertNodeHttpToRequest,
+    HttpQueryError
+} from 'apollo-server-core';
 import { Request, Response } from 'restify';
-import { renderPlaygroundPage, RenderPageOptions } from '@apollographql/graphql-playground-html';
-import { parseAll } from 'accept';
-
-import { graphqlRestify } from './restifyApollo';
+import {
+    renderPlaygroundPage,
+    RenderPageOptions
+} from '@apollographql/graphql-playground-html';
 
 export type OnHealthCheck = (req: Request) => Promise<any>;
-export type OnError = (req: Request, res: Response, status: number, error?: Error) => any;
-
-export interface ServerRegistration {
-    path?: string;
-}
 
 export const HEALTH_CHECK_URL = '/.well-known/apollo/server-health';
-
-// Interface for Restify middleware
-interface RestifyHandler {
-    req: Request;
-    res: Response;
-    next: Function;
-}
 
 export class ApolloServer extends ApolloServerBase {
     // This integration does not support file uploads.
     protected supportsUploads(): boolean {
         return false;
     }
-    
+
     // This integration supports subscriptions.
     protected supportsSubscriptions(): boolean {
         return true;
     }
 
     // Extract Apollo Server options from the request.
-    async createGraphQLServerOptions(req: Request, res: Response): Promise<GraphQLOptions> {
+    async createGraphQLServerOptions(
+        req: Request,
+        res: Response
+    ): Promise<GraphQLOptions> {
         return super.graphQLServerOptions({ req, res });
     }
 
-    // Prepares and returns an async function that can be used by restify to handle
-    // GraphQL requests.
-    public createHandler({ path }: ServerRegistration = {}) {
-        // We'll kick off the `willStart` right away, so hopefully it'll finish
-        // before the first request comes in.
-        const promiseWillStart = this.willStart();
+    // Handle incoming GraphQL requests using Apollo Server.
+    public createGraphqlHandler() {
+        return restifyAsyncAwaitWrapper(async (req: Request, res: Response) => {
+            await this.willStart();
 
-        return async (req: Request, res: Response, next: Function) => {
-            this.graphqlPath = path || '/graphql';
+            const options = await this.createGraphQLServerOptions(req, res);
+            const { responseInit, graphqlResponse } = await runHttpQuery(
+                [req, res],
+                {
+                    method: req.method!,
+                    options,
+                    query: req.body,
+                    request: convertNodeHttpToRequest(req)
+                }
+            );
 
-            await promiseWillStart;
+            // Use raw here because Apollo returns response as a string.
+            res.sendRaw(graphqlResponse, responseInit.headers);
+        });
+    }
 
-            // If this is a playground request, execute and call next()
-            if (this.handleGraphqlRequestsWithPlayground({ req, res, next })) {
-                next();
-                return
-            } else {
-                // Otherwise handle with server
-                await this.handleGraphqlRequestsWithServer({ req, res, next });
-            }
-            
+    // Handle incoming GraphQL Playground requests.
+    public createPlaygroundlHandler() {
+        return (req: Request, res: Response, next: Function) => {
+            const middlewareOptions: RenderPageOptions = {
+                version: '1',
+                endpoint: this.graphqlPath,
+                subscriptionEndpoint: this.subscriptionsPath,
+                ...this.playgroundOptions
+            };
+            const playgroundHTML = renderPlaygroundPage(middlewareOptions);
+            res.header('Content-Type', 'text/html');
+
+            // Use raw here because Playground returns HTML as a string.
+            res.sendRaw(playgroundHTML);
+            return next();
         };
     }
 
-    createHealthCheckHandler({ onHealthCheck }: { onHealthCheck?: OnHealthCheck } = {}) {
-        return async (req: Request, res: Response, next: Function) => {
-            // Response follows
-            // https://tools.ietf.org/html/draft-inadarei-api-health-check-01
-            res.header('Content-Type', 'application/health+json');
-
+    // Handle incoming healthcheck requests.
+    public createHealthCheckHandler({
+        onHealthCheck
+    }: { onHealthCheck?: OnHealthCheck } = {}) {
+        return restifyAsyncAwaitWrapper(async (req: Request, res: Response) => {
             if (onHealthCheck) {
                 try {
                     await onHealthCheck(req);
@@ -76,66 +87,37 @@ export class ApolloServer extends ApolloServerBase {
                 }
             }
 
-            res.send(200, { status: 'pass' });
-            next();
-        };
+            // Response follows
+            // https://tools.ietf.org/html/draft-inadarei-api-health-check-01
+            res.header('Content-Type', 'application/health+json');
+            res.json({ status: 'pass' });
+        });
     }
+}
 
-    // If the `playgroundOptions` are set, register a `graphql-playground` instance
-    // (not available in production) that is then used to handle all
-    // incoming GraphQL requests.
-    private handleGraphqlRequestsWithPlayground({
-        req,
-        res,
-        next
-    }: RestifyHandler): boolean {
-        let handled = false;
-
-        if (this.playgroundOptions && req.method === 'GET') {
-            const accept = parseAll(req.headers);
-            const types = accept.mediaTypes as string[];
-            const prefersHTML =
-                types.find((x: string) => x === 'text/html' || x === 'application/json') ===
-                'text/html';
-
-            if (prefersHTML) {
-                const middlewareOptions:RenderPageOptions = {
-                    version: "1",
-                    endpoint: this.graphqlPath,
-                    subscriptionEndpoint: this.subscriptionsPath,
-                    ...this.playgroundOptions
-                };
-                const playgroundHTML = renderPlaygroundPage(middlewareOptions);
-                res.sendRaw(200, playgroundHTML, {
-                    'Content-Type': 'text/html'
-                });
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    // Handle incoming GraphQL requests using Apollo Server.
-    private async handleGraphqlRequestsWithServer({
-        req,
-        res,
-        next,
-    }: RestifyHandler): Promise<void> {
-        const graphqlHandler = graphqlRestify(() => this.createGraphQLServerOptions(req, res));
-    
-        try {
-            const { responseInit, graphqlResponse } = await graphqlHandler(req, res);
-            res.sendRaw(200, graphqlResponse, responseInit.headers);
+// Turns restify handler to async-await handler.
+function restifyAsyncAwaitWrapper(handler: Function) {
+    return (req: Request, res: Response, next: Function) => {
+        (async () => {
+            await handler(req, res);
             return next();
-        } catch (error) {
-            // Per the Restify documentation, errors will be set on the response
-            // and the HttpQueryError will be passed to `next`.
-            if ('HttpQueryError' === error.name && error.headers) {
-                res.set(error.headers);
+        })().catch((err: HttpQueryError) => {
+            // Let Resitfy handle non GraphQL errors.
+            if (err.name !== 'HttpQueryError') {
+                return next(err);
             }
-            res.sendRaw(error.statusCode || 500, error.message);
-            next(error);
-        }
-    }
+
+            // HttpQueryError
+            if (err.headers) {
+                res.set(err.headers);
+            }
+            if (err.statusCode) {
+                res.status(err.statusCode);
+            }
+
+            // Use raw here because Apollo returns error message as a string.
+            res.sendRaw(err.message);
+            return next();
+        });
+    };
 }

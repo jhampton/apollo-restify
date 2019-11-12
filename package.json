@@ -26,16 +26,14 @@
   "license": "MIT",
   "dependencies": {
     "@apollographql/graphql-playground-html": "^1.6.24",
-    "@babel/preset-env": "^7.6.3",
-    "@babel/preset-typescript": "^7.6.0",
-    "@types/jest": "^24.0.18",
-    "accept": "^3.1.3",
     "apollo-server-core": "^2.9.7",
     "graphql-subscriptions": "^1.1.0",
     "graphql-tools": "^4.0.6"
   },
   "devDependencies": {
-    "@types/accept": "^3.1.1",
+    "@babel/preset-env": "^7.6.3",
+    "@babel/preset-typescript": "^7.6.0",
+    "@types/jest": "^24.0.18",
     "@types/restify": "^8.4.1",
     "apollo-fetch": "^0.7.0",
     "jest": "^24.9.0",
