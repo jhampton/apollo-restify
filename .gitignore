@@ -3,6 +3,3 @@ lib/
 apollo-restify.code-workspace
 .vscode/launch.json
 coverage
-
-yarn.lock
-package-lock.json
