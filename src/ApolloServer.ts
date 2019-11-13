@@ -1,33 +1,26 @@
 import {
-    ApolloServerBase,
-    GraphQLOptions,
-    runHttpQuery,
-    convertNodeHttpToRequest,
-    HttpQueryError
-} from 'apollo-server-core';
-import { Request, Response } from 'restify';
-import {
-    renderPlaygroundPage,
-    RenderPageOptions
+    RenderPageOptions,
+    renderPlaygroundPage
 } from '@apollographql/graphql-playground-html';
+import {
+    ApolloServerBase,
+    convertNodeHttpToRequest,
+    GraphQLOptions,
+    HttpQueryError,
+    runHttpQuery
+} from 'apollo-server-core';
+
+// tslint:disable-next-line no-implicit-dependencies
+import { Request, Response } from 'restify';
 
 export type OnHealthCheck = (req: Request) => Promise<any>;
 
 export const HEALTH_CHECK_URL = '/.well-known/apollo/server-health';
 
 export class ApolloServer extends ApolloServerBase {
-    // This integration does not support file uploads.
-    protected supportsUploads(): boolean {
-        return false;
-    }
-
-    // This integration supports subscriptions.
-    protected supportsSubscriptions(): boolean {
-        return true;
-    }
 
     // Extract Apollo Server options from the request.
-    async createGraphQLServerOptions(
+    public async createGraphQLServerOptions(
         req: Request,
         res: Response
     ): Promise<GraphQLOptions> {
@@ -57,11 +50,11 @@ export class ApolloServer extends ApolloServerBase {
 
     // Handle incoming GraphQL Playground requests.
     public createPlaygroundlHandler() {
-        return (req: Request, res: Response, next: Function) => {
+        return (req: Request, res: Response, next: (err?: Error) => void) => {
             const middlewareOptions: RenderPageOptions = {
-                version: '1',
                 endpoint: this.graphqlPath,
                 subscriptionEndpoint: this.subscriptionsPath,
+                version: '1',
                 ...this.playgroundOptions
             };
             const playgroundHTML = renderPlaygroundPage(middlewareOptions);
@@ -93,11 +86,20 @@ export class ApolloServer extends ApolloServerBase {
             res.json({ status: 'pass' });
         });
     }
+    // This integration does not support file uploads.
+    protected supportsUploads(): boolean {
+        return false;
+    }
+
+    // This integration supports subscriptions.
+    protected supportsSubscriptions(): boolean {
+        return true;
+    }
 }
 
 // Turns restify handler to async-await handler.
-function restifyAsyncAwaitWrapper(handler: Function) {
-    return (req: Request, res: Response, next: Function) => {
+function restifyAsyncAwaitWrapper(handler: (req: Request, res: Response) => void) {
+    return (req: Request, res: Response, next: (err?: Error) => void) => {
         (async () => {
             await handler(req, res);
             return next();

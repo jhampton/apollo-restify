@@ -5,6 +5,8 @@
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc",
+    "lint": "tslint --project .",
+    "lint:fix": "tslint --fix --project .",
     "watch": "tsc --watch",
     "prepare": "npm run build",
     "postpublish": "git push && git push --tags",
@@ -38,7 +40,10 @@
     "apollo-fetch": "^0.7.0",
     "jest": "^24.9.0",
     "node-mocks-http": "^1.8.0",
+    "prettier": "^1.19.1",
     "restify": "^8.4.0",
+    "tslint": "^5.20.1",
+    "tslint-config-prettier": "^1.18.0",
     "typescript": "^3.7.2"
   }
 }

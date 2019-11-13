@@ -12,8 +12,8 @@ type User {
 
 
 type Post {
-    id: ID!
-    title: String
-    body: String
-    bodyIsHtml: Boolean
+  id: ID!
+  title: String
+  body: String
+  bodyIsHtml: Boolean
 }
