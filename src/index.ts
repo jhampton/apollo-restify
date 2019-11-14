@@ -22,4 +22,4 @@ export * from 'graphql-tools';
 export * from 'graphql-subscriptions';
 
 // ApolloServer integration.
-export { ApolloServer, ServerRegistration, HEALTH_CHECK_URL } from './ApolloServer';
+export { ApolloServer, HEALTH_CHECK_URL } from './ApolloServer';
