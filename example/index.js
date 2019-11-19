@@ -1,11 +1,11 @@
-const restify = require('restify');
-const { ApolloServer, HEALTH_CHECK_URL } = require('../lib/');
-const { readFileSync } = require('fs');
-const { resolve } = require('path');
-const { gql } = require('apollo-server-core');
+const restify = require("restify");
+const { ApolloServer, HEALTH_CHECK_URL } = require("../lib/");
+const { readFileSync } = require("fs");
+const { resolve } = require("path");
+const { gql } = require("apollo-server-core");
 
 const typeDefs = gql(
-    readFileSync(resolve(__dirname, './schema.graphql'), { encoding: 'utf8' })
+    readFileSync(resolve(__dirname, "./schema.graphql"), { encoding: "utf8" })
 );
 
 // Apollo Server
@@ -16,7 +16,23 @@ const apolloServer = new ApolloServer({
     playground: true,
     introspection: true,
     debug: true,
-    mockEntireSchema: true
+    mockEntireSchema: true,
+    plugins: [
+        {
+            serverWillStart() {
+                console.log("Server starting up!");
+            },
+            requestDidStart() {
+                return {
+                    willSendResponse: ctx => {
+                        console.log(
+                            ctx.operationName || ctx.operation.operation
+                        );
+                    }
+                };
+            }
+        }
+    ]
 });
 
 // Restify
@@ -25,27 +41,27 @@ server.use(restify.plugins.bodyParser());
 
 // Playground
 server.get(
-    '/graphql',
+    "/graphql",
     restify.plugins.conditionalHandler([
         {
-            contentType: 'text/html',
+            contentType: "text/html",
             handler: apolloServer.createPlaygroundlHandler()
         },
         {
-            contentType: 'application/json',
+            contentType: "application/json",
             handler: apolloServer.createGraphqlHandler()
         }
     ])
 );
 
 // Data endpoint:
-server.post('/graphql', apolloServer.createGraphqlHandler());
+server.post("/graphql", apolloServer.createGraphqlHandler());
 
 server.get(HEALTH_CHECK_URL, apolloServer.createHealthCheckHandler());
 
 // Hello
-server.get('/', (req, res, next) => {
-    res.send('Hello World');
+server.get("/", (req, res, next) => {
+    res.send("Hello World");
     next();
 });
 

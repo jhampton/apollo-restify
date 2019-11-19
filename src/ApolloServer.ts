@@ -7,7 +7,8 @@ import {
     convertNodeHttpToRequest,
     GraphQLOptions,
     HttpQueryError,
-    runHttpQuery
+    runHttpQuery,
+    Config
 } from 'apollo-server-core';
 
 // tslint:disable-next-line no-implicit-dependencies
@@ -29,9 +30,10 @@ export class ApolloServer extends ApolloServerBase {
 
     // Handle incoming GraphQL requests using Apollo Server.
     public createGraphqlHandler() {
-        return restifyAsyncAwaitWrapper(async (req: Request, res: Response) => {
-            await this.willStart();
+        const willStartPromise =  this.willStart();
 
+        return restifyAsyncAwaitWrapper(async (req: Request, res: Response) => {
+            const didWillStart = await willStartPromise;
             const options = await this.createGraphQLServerOptions(req, res);
             const { responseInit, graphqlResponse } = await runHttpQuery(
                 [req, res],
